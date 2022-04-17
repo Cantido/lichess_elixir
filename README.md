@@ -1,6 +1,6 @@
 # LichessElixir
 
-Elixir library for (Lichess)[lichess.org].
+Elixir library for lichess.org.
 
 ## Installation
 
