@@ -5,7 +5,7 @@ defmodule LichessElixir.MixProject do
     [
       app: :lichess_elixir,
       description: "A Lichess library for Elixir",
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       source_url: "https://github.com/Cantido/lichess_elixir",
