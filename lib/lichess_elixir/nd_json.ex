@@ -1,8 +1,18 @@
 defmodule LichessElixir.NDJSON do
-  def stream(url, headers) do
+  alias LichessElixir.HTTPStream
+  require Logger
+
+  def stream(url, _headers) do
+    http_stream(url)
+    |> chunk_by_char(?\n)
+    |> Stream.map(&IO.chardata_to_string/1)
+    |> Stream.map(&Jason.decode!/1)
+  end
+
+  def chunk_by_char(stream, char) do
     chunk_fun = fn
-      ?\n, acc -> {:cont, Enum.reverse(acc), []}
-      i, acc -> {:cont, [i | acc]}
+      ^char, acc -> {:cont, Enum.reverse(acc), []}
+      x, acc -> {:cont, [x | acc]}
     end
 
     after_fun = fn
@@ -10,24 +20,17 @@ defmodule LichessElixir.NDJSON do
       acc -> {:cont, Enum.reverse(acc), []}
     end
 
-    http_stream(url, headers)
-    |> Stream.chunk_while([], chunk_fun, after_fun)
-    |> Stream.map(&IO.chardata_to_string/1)
-    |> Stream.map(&Jason.decode!/1)
+    Stream.chunk_while(stream, [], chunk_fun, after_fun)
   end
 
+  defp http_stream(url) do
+    {:ok, pid} = HTTPStream.start(url)
 
-  defp http_stream(url, headers) do
     Stream.resource(
-      fn -> HTTPoison.get!(url, headers, stream_to: self(), async: :once) end,
-      fn %{id: ref} = acc ->
-        HTTPoison.stream_next(acc)
-        receive do
-          %HTTPoison.AsyncStatus{id: ^ref} -> {[], acc}
-          %HTTPoison.AsyncHeaders{id: ^ref} -> {[], acc}
-          %HTTPoison.AsyncChunk{id: ^ref, chunk: data} -> {:binary.bin_to_list(data), acc}
-          %HTTPoison.AsyncEnd{id: ^ref} -> {:halt, acc}
-        end
+      fn -> {pid, 0} end,
+      fn {pid, n} ->
+        chunk = HTTPStream.get(pid, n)
+        {[chunk], {pid, n + 1}}
       end,
       fn _acc -> :ok end
     )
